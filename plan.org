@@ -1,0 +1,22 @@
+* Modules
+** Cartridge
+*** Read
+*** Representation
+** CPU
+** Inputs
+*** D-pad
+*** Buttons
+** PPU
+** Screen/rendering
+** Sound
+** RAM
+* OpCodes
+** Probably need some way of dynamically declaring them
+** Op code execution 
+* Operation
+** Load cartridge
+*** Set as memory 0000-8000
+** Set PC to 0x0000 and run internal startup sequence
+** Begin executing instructions
+*** Maybe need to do the checksum thing?
+** TODO Memory bank selection

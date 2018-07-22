@@ -1,23 +1,24 @@
 package cpu
 
 const (
-	registerNames = []string{"A", "B", "C", "D", "E", "F", "H", "L"}
+	registers8bit = []string{"A", "B", "C", "D", "E", "F", "H", "L"}
+	combinationRegisters = []string{"AF", "BC", "DE", "HL"}
+	registers16Bit = []string{ "PC", "SP", "FR"}
 )
 
-type OpCode struct {
-	Name string
-	Code int
+type RegisterName string
+
+type OpCode interface {
+	Run(cpu Cpu) error
+	Name() string
+	DebugString() string
+	Cycles() int
 }
 
 type Register struct {
 	Name string
 	Value []byte
 }
-
-var (
-	NOP = OpCode{"NOP", 0}
-	ADD = OpCode{"ADD", 1}
-)
 
 type Cpu struct {
 	// more fields to come
@@ -28,34 +29,68 @@ type Cpu struct {
 	flagRegister Register
 }
 
+type BaseOpCode struct {
+	name string
+	code byte
+	cycles int
+}
+
+func (b BaseOpCode) Name() string {
+	return b.name
+}
+
+func (b BaseOpCode) DebugString() string {
+	return fmt.Sprintf("%x - %s", b.code, b.name)
+}
+
+func (b BaseOpCode) Cycles() int {
+	return b.cycles
+}
+
+type LdRegisterOpCode struct {
+	BaseOpCode
+	r1 RegisterName
+	r2 RegisterName
+}
+
+func (b LdRegisterOpCode) Run(cpu Cpu) error {
+	cpu.registers[r1].Value[0] = cpu.registers[r2].value[0]
+}
+
 // Initializes a default CPU
 func newCpu(memory *Memory) (*Cpu) {
 	registerMap := make(map[string]Register)
-	for _, registerName := range registerNames {
+	for _, registerName := range registers8Bit {
+		var value byte
 		registerMap[registerName] = Register{
 			Name: registerName,
-			Value: []byte{0},
+			Value: []*byte{&value},
+		}
+	}
+
+	for _, registerName := range registers16Bit {
+		var value1 byte
+		var value2 byte
+		registerMap[registerName] = Register{
+			Name: registerName,
+			Value: []*byte{&value1, &value2},
+		}
+	}
+
+	for _, registerName := range combinationRegisters {
+		register1 := registerMap[registerName[0]]
+		register2 := registerMap[registerName[1]]
+		registerMap[registerName] = Register{
+			Name: registerName,
+			Value: []*byte{register1.Value[0], register2.Value[1]}.
 		}
 	}
 
 	return &Cpu{
 		memory: memory,
 		registers: registerMap,
-		programCounter: &Register{
-			Name: "PC",
-			Value: []byte{0, 100}, // might need to be hex...
-		},
-		stackPointer: &Register{
-			Name: "SP",
-			Value: []byte{255, 255} // TODO: Convert memory length into 16 bit array
-		},
-		flagRegister: &Register{
-			Name: "FR",
-			Value: []byte{0}, // TODO: this might be 16 bits
-		},
+		programCounter: registerMap["PC"],
+		stackPointer: registerMap["SP"],
+		flagRegister: registerMap["FR"],
 	}
-}
-
-func (c *Cpu) runOp(op OpCode) (error) {
-	
 }
