@@ -1,12 +1,16 @@
-package cpu
+package gametoy
 
-const (
-	registers8bit = []string{"A", "B", "C", "D", "E", "F", "H", "L"}
-	combinationRegisters = []string{"AF", "BC", "DE", "HL"}
-	registers16Bit = []string{ "PC", "SP", "FR"}
+import (
+	"fmt"
 )
 
 type RegisterName string
+
+var (
+	registers8Bit = []RegisterName{"A", "B", "C", "D", "E", "F", "H", "L"}
+	combinationRegisters = []RegisterName{"AF", "BC", "DE", "HL"}
+	registers16Bit = []RegisterName{"PC", "SP", "FR"}
+)
 
 type OpCode interface {
 	Run(cpu Cpu) error
@@ -16,14 +20,14 @@ type OpCode interface {
 }
 
 type Register struct {
-	Name string
-	Value []byte
+	Name RegisterName
+	Value []*byte
 }
 
 type Cpu struct {
 	// more fields to come
 	memory *Memory
-	registers map[string]Register
+	registers map[RegisterName]Register
 	programCounter Register
 	stackPointer Register
 	flagRegister Register
@@ -54,12 +58,13 @@ type LdRegisterOpCode struct {
 }
 
 func (b LdRegisterOpCode) Run(cpu Cpu) error {
-	cpu.registers[r1].Value[0] = cpu.registers[r2].value[0]
+	cpu.registers[b.r1].Value[0] = cpu.registers[b.r2].Value[0]
+	return nil
 }
 
 // Initializes a default CPU
 func newCpu(memory *Memory) (*Cpu) {
-	registerMap := make(map[string]Register)
+	registerMap := make(map[RegisterName]Register)
 	for _, registerName := range registers8Bit {
 		var value byte
 		registerMap[registerName] = Register{
@@ -78,11 +83,11 @@ func newCpu(memory *Memory) (*Cpu) {
 	}
 
 	for _, registerName := range combinationRegisters {
-		register1 := registerMap[registerName[0]]
-		register2 := registerMap[registerName[1]]
+		register1 := registerMap[RegisterName(registerName[0])]
+		register2 := registerMap[RegisterName(registerName[1])]
 		registerMap[registerName] = Register{
 			Name: registerName,
-			Value: []*byte{register1.Value[0], register2.Value[1]}.
+			Value: []*byte{register1.Value[0], register2.Value[1]},
 		}
 	}
 

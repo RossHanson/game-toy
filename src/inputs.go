@@ -1,4 +1,4 @@
-package io
+package gametoy
 
 type Dpad struct {
 	// Fields to come

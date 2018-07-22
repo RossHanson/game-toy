@@ -1,4 +1,4 @@
-package soundcard
+package gametoy
 
 type Soundcard struct {
 	// Fields to come!

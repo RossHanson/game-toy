@@ -1,4 +1,4 @@
-package screen
+package gametoy
 
 type Screen struct {
 	// fields to come

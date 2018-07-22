@@ -1,4 +1,4 @@
-package memory
+package gametoy
 
 const (
 	mainMemorySize = 8 * 1024
@@ -10,7 +10,7 @@ type Memory struct {
 }
 
 func (s *Memory) Size() int {
-	return len(memory)
+	return len(s.memory)
 }
 
 func (s *Memory) Get(address int) byte {
