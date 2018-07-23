@@ -12,11 +12,20 @@
 ** RAM
 * OpCodes
 ** Probably need some way of dynamically declaring them
-** Op code execution 
+*** Define base op code class with subclasses for each kind of opcode operation
+**** TODO LD
+**** TODO Arithmetic/logical operations
+**** TODO Jumps
+**** TODO Push/pop
+**** TODO CB operations (note (HL) instructions only take 12!!)
+** Op code execution
+* Setting up project
+** TODO Split out modules into directories (ugh)
+** TODO Set up main build plus per-module builds (double ugh)
 * Operation
 ** Load cartridge
 *** Set as memory 0000-8000
 ** Set PC to 0x0000 and run internal startup sequence
 ** Begin executing instructions
 *** Maybe need to do the checksum thing?
-** TODO Memory bank selection
+** TODO Memory bank selection?

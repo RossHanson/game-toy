@@ -1,4 +1,4 @@
-package gametoy
+package memory
 
 import (
 	"fmt"
@@ -27,6 +27,11 @@ func (s *Memory) Get(address []byte) (byte, error) {
 	return s.memory[int(uintAddress)], nil
 }
 
+func (s *Memory) GetInt(address int) (byte, error) {
+	// Again no range checking yet
+	return s.memory[address], nil 
+}
+
 func (s *Memory) Set(address []byte, value byte) error {
 	if len(address) != 2 {
 		return fmt.Errorf("addresses must be 16 bits")
@@ -34,4 +39,16 @@ func (s *Memory) Set(address []byte, value byte) error {
 	uintAddress := binary.BigEndian.Uint16(address)
 	s.memory[int(uintAddress)] = value
 	return nil
+}
+
+func SetupBlankMemory(size int) *Memory {
+	return &Memory{
+		memory: make([]byte, size),
+	}
+}
+
+func InitializeMainMemory() *Memory {
+	return &Memory{
+		memory: make([]byte, mainMemorySize),
+	}
 }

@@ -1,7 +1,8 @@
-package gametoy
+package cpu
 
 import (
 	"fmt"
+	"memory"
 )
 
 type RegisterName string
@@ -33,7 +34,7 @@ func (r *Register) is8Bit() bool {
 
 type Cpu struct {
 	// more fields to come
-	memory *Memory
+	memory *memory.Memory
 	registers map[RegisterName]Register
 	programCounter Register
 	stackPointer Register
@@ -90,7 +91,7 @@ func (b LdRegisterOpCode) Run(cpu *Cpu) (int, error) {
 }
 
 // Initializes a default CPU
-func newCpu(memory *Memory) (*Cpu) {
+func NewCpu(memory *memory.Memory) (*Cpu) {
 	registerMap := make(map[RegisterName]Register)
 	for _, registerName := range registers8Bit {
 		var value byte

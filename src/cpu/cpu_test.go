@@ -1,7 +1,8 @@
-package gametoy
+package cpu
 
 import (
 	"testing"
+	"memory"
 )
 
 const (
@@ -19,11 +20,9 @@ func TestOpCodeName(t *testing.T) {
 	}
 }
 
-func setupCpu() (*Cpu, *Memory) {
-	memory := &Memory{
-		memory: make([]byte, mockMemorySize),
-	}
-	return newCpu(memory), memory
+func setupCpu() (*Cpu, *memory.Memory) {
+	memory := memory.SetupBlankMemory(mockMemorySize)
+	return NewCpu(memory), memory
 }
 
 func TestLdOpCode_registerToRegister(t *testing.T) {
@@ -50,7 +49,8 @@ func TestLdOpCode_registerToRegister(t *testing.T) {
 			cpu.registers["B"].Value[0])
 	}
 	// Verify memory was not updated
-	for _, memoryByte := range memory.memory {
+	for address := 0; address < mockMemorySize; address++ {
+		memoryByte, _ := memory.GetInt(address)
 		if memoryByte != 0 {
 			t.Errorf("Memory updated inappropriately, want: 0x00, got: %x",
 				memoryByte)

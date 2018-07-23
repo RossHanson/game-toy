@@ -2,13 +2,13 @@
 
 PACKAGE = game-toy
 DATE ?= $(shell date +%FT%T%z)
-GOPATH = $(CURDIR)/.gopath
+export GOPATH = $(CURDIR)/.gopath
 BASE = $(GOPATH)/src
 BIN = $(GOPATH)/bin
 GO = go
 GODOC = godoc
 GOFMT = gofmt
-PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
+PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "_"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 TIMEOUT =30s
 
@@ -27,4 +27,4 @@ all: | $(BASE)
 $(TEST_TARGETS): NAME=$(MAKECMDGOALS:test-%=%)
 $(TEST_TARGETS): test
 check test tests: | $(BASE) ; $(info running $(NAME=%=% )tests...) @
-	$Q cd $(BASE) && $(GO) test -timeout $(TIMEOUT)
+	$Q cd $(BASE) && $(GO) test -timeout $(TIMEOUT) $(TESTPKGS)
