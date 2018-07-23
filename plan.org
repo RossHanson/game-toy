@@ -20,8 +20,8 @@
 **** TODO CB operations (note (HL) instructions only take 12!!)
 ** Op code execution
 * Setting up project
-** TODO Split out modules into directories (ugh)
-** TODO Set up main build plus per-module builds (double ugh)
+** DONE Split out modules into directories (ugh)
+** DONE Set up main build plus per-module builds (double ugh)
 * Operation
 ** Load cartridge
 *** Set as memory 0000-8000

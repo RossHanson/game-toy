@@ -3,6 +3,9 @@ package cpu
 import (
 	"fmt"
 	"memory"
+	"log"
+	"encoding/binary"
+	"utils"
 )
 
 type RegisterName string
@@ -25,20 +28,39 @@ type OpCode interface {
 
 type Register struct {
 	Name RegisterName
-	Value []*byte
+	value []*byte
+}
+
+func (r *Register) Assign(value ...byte) error {
+	if len(r.value) != len(value) {
+		return fmt.Errorf("Attempted to assign a %d bit value to a %d bit register", 8*len(value), 8*len(r.value))
+	}
+	log.Printf("Assigning value %x into %s", value, r.Name)
+	for index, val := range value {
+		*r.value[index] = val
+	}
+	return nil
+}
+
+func (r *Register) Retrieve() []byte {
+	result := make([]byte, len(r.value))
+	for index, val := range r.value {
+		result[index] = *val
+	}
+	return result
 }
 
 func (r *Register) is8Bit() bool {
-	return len(r.Value) == 1
+	return len(r.value) == 1
 }
 
 type Cpu struct {
 	// more fields to come
 	memory *memory.Memory
-	registers map[RegisterName]Register
-	programCounter Register
-	stackPointer Register
-	flagRegister Register
+	registers map[RegisterName]*Register
+	programCounter *Register
+	stackPointer *Register
+	flagRegister *Register
 }
 
 type BaseOpCode struct {
@@ -59,63 +81,33 @@ func (b BaseOpCode) Length() int {
 	return b.length
 }
 
-type LdRegisterOpCode struct {
-	BaseOpCode
-	r1 RegisterName
-	r2 RegisterName
-	// If one of the registers is 16 bit, it's assumed to be a load from memory
-}
-
-func (b LdRegisterOpCode) Run(cpu *Cpu) (int, error) {
-	r1 := cpu.registers[b.r1]
-	r2 := cpu.registers[b.r2]
-	if r1.is8Bit() && r2.is8Bit() {
-		*r1.Value[0] = *r2.Value[0]
-		return 4, nil
-	}
-	if !r1.is8Bit() && !r2.is8Bit() {
-		return 0, fmt.Errorf("This op code is undefined")
-	}
-	if r1.is8Bit() {
-		// Load the value in memory from r2
-		memoryValue, err := cpu.memory.Get(
-			[]byte{*r2.Value[0], *r2.Value[1]})
-		if err != nil {
-			*r1.Value[0] = memoryValue
-		}
-		return 8, err
-	}
-	// Set the memory at r1 to the value from r2
-	err := cpu.memory.Set([]byte{*r1.Value[0], *r1.Value[1]}, *r2.Value[0])
-	return 8, err
-}
 
 // Initializes a default CPU
 func NewCpu(memory *memory.Memory) (*Cpu) {
-	registerMap := make(map[RegisterName]Register)
+	registerMap := make(map[RegisterName]*Register)
 	for _, registerName := range registers8Bit {
 		var value byte
-		registerMap[registerName] = Register{
+		registerMap[registerName] = &Register{
 			Name: registerName,
-			Value: []*byte{&value},
+			value: []*byte{&value},
 		}
 	}
 
 	for _, registerName := range registers16Bit {
 		var value1 byte
 		var value2 byte
-		registerMap[registerName] = Register{
+		registerMap[registerName] = &Register{
 			Name: registerName,
-			Value: []*byte{&value1, &value2},
+			value: []*byte{&value1, &value2},
 		}
 	}
 
 	for _, registerName := range combinationRegisters {
 		register1 := registerMap[RegisterName(registerName[0])]
 		register2 := registerMap[RegisterName(registerName[1])]
-		registerMap[registerName] = Register{
+		registerMap[registerName] = &Register{
 			Name: registerName,
-			Value: []*byte{register1.Value[0], register2.Value[0]},
+			value: []*byte{register1.value[0], register2.value[0]},
 		}
 	}
 
@@ -126,4 +118,21 @@ func NewCpu(memory *memory.Memory) (*Cpu) {
 		stackPointer: registerMap["SP"],
 		flagRegister: registerMap["FR"],
 	}
+}
+
+
+
+func (c *Cpu) LoadImmediateData(length int) ([]byte, error) {
+	data := make([]byte, length)
+	pc := binary.LittleEndian.Uint16(c.programCounter.Retrieve())
+	pc++ // skip 1 for the current instruction
+	for offset := 0; offset < length; offset++ {
+		memoryValue, err := c.memory.Get(utils.EncodeInt(int(pc) + offset))
+		if err != nil {
+			return nil, err
+		}
+		data[offset] = memoryValue
+	}
+	return data, nil
+
 }
