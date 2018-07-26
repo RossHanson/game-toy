@@ -7,10 +7,18 @@ import (
 	"types"
 )
 
+const (
+	_ = iota
+	Z
+	N
+	H
+	C
+)
+
 type OpCode interface {
 	// Execute the operation and return the number of cycles consumed,
 	// or an error if one occurs.
-	Run(cpu *Cpu) (int, error)
+	Run(cpu *Cpu) (cycles int, pcModified bool, err error)
 	Name() string
 	DebugString() string
 	Cycles() int
@@ -58,6 +66,24 @@ func (r *Register8Bit) Decrement() (zero bool, halfCarry bool) {
 	return zeroFlag, halfCarryFlag
 }
 
+func (r *Register8Bit) SetBit(bit byte, value bool) {
+	if uint(bit) > 7 {
+		log.Fatalf("Set bit maximum is 7! Got: %d", uint(bit))
+	}
+	if value {
+		r.value |= (1 << uint(bit))
+	} else {
+		r.value &= ^(1 << uint(bit))
+	}
+}
+
+func (r *Register8Bit) GetBit(bit byte) bool {
+	if uint(bit) > 7 {
+		log.Fatalf("Get bit maximum is 7! Got: %d", uint(bit))
+	}
+	return r.value & (1 << uint(bit)) != 0x00
+}
+
 func (r *Register16Bit) Assign(val types.Word) {
 	lsb, msb := val.ToBytes()
 	*r.lsb = lsb
@@ -86,7 +112,7 @@ type Cpu struct {
 	// more fields to come
 	memory *memory.Memory
 	A, B, C, D, E, F, H, L Register8Bit
-	BC, DE, HL, SP, PC Register16Bit
+	AF, BC, DE, HL, SP, PC Register16Bit
 }
 
 type BaseOpCode struct {
@@ -127,6 +153,7 @@ func NewCpu(memory *memory.Memory) (*Cpu) {
 		mixed.Name = lsb.Name + msb.Name
 	}
 
+	setupMixedRegister(&cpu.AF, &cpu.A, &cpu.F)
 	setupMixedRegister(&cpu.BC, &cpu.B, &cpu.C)
 	setupMixedRegister(&cpu.DE, &cpu.D, &cpu.E)
 	setupMixedRegister(&cpu.HL, &cpu.H, &cpu.L)
@@ -157,4 +184,35 @@ func (c *Cpu) LoadImmediateWord() (types.Word, error) {
 		return types.Word(0), err
 	}
 	return types.WordFromBytes(lsb, msb), nil
+}
+
+func (c *Cpu) SetFlag(flag int, value bool) {
+	switch flag {
+	case Z:
+		c.F.SetBit(7, value)
+	case N:
+		c.F.SetBit(6, value)
+	case H:
+		c.F.SetBit(5, value)
+	case C:
+		c.F.SetBit(4, value)
+	default:
+		log.Fatalf("Unknown flag: %c", flag)
+	}
+}
+
+func (c *Cpu) GetFlag(flag int) bool {
+	switch flag {
+	case Z:
+		return c.F.GetBit(7)
+	case N:
+		return c.F.GetBit(6)
+	case H:
+		return c.F.GetBit(5)
+	case C:
+		return c.F.GetBit(4)
+	default:
+		log.Fatalf("Unknown flag: %c", flag)
+		return false // think I need this for the compiler
+	}
 }

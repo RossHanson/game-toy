@@ -34,9 +34,12 @@ func TestLdOpCode_registerToRegister(t *testing.T) {
 		r1: &cpu.A,
 		r2: &cpu.B,
 	}
-	result, err := opcode.Run(cpu)
+	result, pcModified, err := opcode.Run(cpu)
 	if err != nil {
 		t.Fatalf("Error running opcode: %v", err)
+	}
+	if pcModified {
+		t.Error("Incorrectly changed PC, want: false, got: true")
 	}
 	if result != 4 {
 		t.Errorf("Incorrect number of cycles, want: 4, got: %d", result)
@@ -72,10 +75,13 @@ func TestLdMemoryRead(t *testing.T) {
 		r1: &cpu.A,
 		r2: &cpu.BC,
 	}
-	cycles, err := opcode.Run(cpu)
+	cycles, pcModified, err := opcode.Run(cpu)
 
 	if err != nil {
 		t.Fatalf("Error running opcode: %v", err)
+	}
+	if pcModified {
+		t.Errorf("PC modified incorrectly, want: false, got: true")
 	}
 
 	if cycles != 8 {
@@ -128,9 +134,12 @@ func TestLdMemorySet(t *testing.T) {
 				decrementR1: tc.isDecrement,
 			}
 
-			cycles, err := opCode.Run(cpu)
+			cycles, pcModified, err := opCode.Run(cpu)
 			if err != nil {
 				t.Fatalf("Error running test: %v", err)
+			}
+			if pcModified {
+				t.Error("PC incorrectly modified, want: false, got: true")
 			}
 			if cycles != 8 {
 				t.Errorf("Incorrect number of cycles, want: 8, got: %d", cycles)
@@ -175,9 +184,12 @@ func TestLdImmediateByteOpCode(t *testing.T) {
 		r1: &cpu.A,
 	}
 
-	cycles, err := opCode.Run(cpu)
+	cycles, pcModified, err := opCode.Run(cpu)
 	if err != nil {
 		t.Fatalf("Error running opcode: %v", err)
+	}
+	if pcModified {
+		t.Errorf("PC modified incorrectly, want: false, got: true")
 	}
 
 	if cycles != 8 {
@@ -201,11 +213,13 @@ func TestLdImmediateWordOpCode(t *testing.T) {
 	opCode := &Ld16BitImmediateOpCode{
 		r1: &cpu.DE,
 	}
-	cycles, err := opCode.Run(cpu)
+	cycles, pcModified, err := opCode.Run(cpu)
 	if err != nil {
 		t.Fatalf("Error running opcode: %v", err)
 	}
-
+	if pcModified {
+		t.Errorf("PC modified incorrectly, want: false, got: true")
+	}
 	if cycles != 12 {
 		t.Errorf("Incorrect number of cycles, want: 12, got: %d", cycles)
 	}
@@ -213,5 +227,66 @@ func TestLdImmediateWordOpCode(t *testing.T) {
 	r1Val := cpu.DE.Retrieve()
 	if r1Val != types.WordFromBytes(0xBE, 0xEF) {
 		t.Errorf("Incorrect r1val, want: 0xBEEF, got: %s", r1Val)
+	}
+}
+
+func TestIncDecOpCodes(t *testing.T) {
+	testCases := []struct{
+		name string
+		inputValue byte
+		expectedValue byte
+		expectedZeroFlag bool
+		// Probably should figure out half-carry?
+	} {
+		{
+			name: "Normal increment",
+			inputValue: byte(0x09),
+			expectedValue: byte(0x0A),
+			expectedZeroFlag: false,
+		},
+		{
+			name: "Roll-over",
+			inputValue: byte(0xFF),
+			expectedValue: byte(0x00),
+			expectedZeroFlag: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cpu, _ := setupCpu()
+
+			cpu.A.Assign(tc.inputValue)
+
+			opCode := &IncRegOpCode{
+				r1: &cpu.A,
+			}
+
+			cycles, pcModified, err := opCode.Run(cpu)
+			if err != nil {
+				t.Fatalf("Error running opcode: %v", err)
+			}
+
+			if pcModified {
+				t.Error("PC incorrectly modified, want: false, got: true")
+			}
+
+			if cycles != 4 {
+				t.Errorf("Incorrect number of cycles, want: 4, got: %d", cycles)
+			}
+
+			r1Val := cpu.A.Retrieve()
+			if r1Val != tc.expectedValue {
+				t.Errorf("Incorrect R1 val, want: %x, got: %x", tc.expectedValue, r1Val)
+			}
+
+			if cpu.GetFlag(Z) != tc.expectedZeroFlag {
+				t.Errorf("Incorrect zero flag, want: %t, got: %t", tc.expectedZeroFlag, cpu.GetFlag(Z))
+			}
+
+			if cpu.GetFlag(N) {
+				t.Errorf("Incorrect subtract flag, want: false, got: true")
+			}
+		})
 	}
 }

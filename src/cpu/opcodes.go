@@ -6,9 +6,9 @@ type Ld8BitRegisterOpCode struct {
 	r2 *Register8Bit
 }
 
-func (b *Ld8BitRegisterOpCode) Run(cpu *Cpu) (int, error) {
+func (b *Ld8BitRegisterOpCode) Run(cpu *Cpu) (int, bool, error) {
 	b.r1.Assign(b.r2.Retrieve())
-	return 4, nil
+	return 4, false, nil
 }
 
 type LdRegIntoMemOpCode struct {
@@ -19,7 +19,7 @@ type LdRegIntoMemOpCode struct {
 	decrementR1 bool
 }
 
-func (b *LdRegIntoMemOpCode) Run(cpu *Cpu) (int, error) {
+func (b *LdRegIntoMemOpCode) Run(cpu *Cpu) (int, bool, error) {
 	dest := b.r1.Retrieve()
 	cpu.memory.Set(dest, b.r2.Retrieve())
 	if b.incrementR1 {
@@ -28,7 +28,7 @@ func (b *LdRegIntoMemOpCode) Run(cpu *Cpu) (int, error) {
 	if b.decrementR1 {
 		b.r1.Decrement()
 	}
-	return 8, nil
+	return 8, false, nil
 }
 
 type LdMemIntoRegOpCode struct {
@@ -39,11 +39,11 @@ type LdMemIntoRegOpCode struct {
 	decrementR2 bool
 }
 
-func (b *LdMemIntoRegOpCode) Run(cpu *Cpu) (int, error) {
+func (b *LdMemIntoRegOpCode) Run(cpu *Cpu) (int, bool, error) {
 	src := b.r2.Retrieve()
 	val, err := cpu.memory.Get(src)
 	if err != nil {
-		return -1, err
+		return -1, false, err
 	}
 
 	if b.incrementR2 {
@@ -54,7 +54,7 @@ func (b *LdMemIntoRegOpCode) Run(cpu *Cpu) (int, error) {
 	}
 
 	b.r1.Assign(val)
-	return 8, nil
+	return 8, false, nil
 }
 
 type Ld8BitImmediateOpCode struct {
@@ -62,13 +62,13 @@ type Ld8BitImmediateOpCode struct {
 	r1 *Register8Bit
 }
 
-func (b *Ld8BitImmediateOpCode) Run(cpu *Cpu) (int, error) {
+func (b *Ld8BitImmediateOpCode) Run(cpu *Cpu) (int, bool, error) {
 	immediateByte, err := cpu.LoadImmediateByte()
 	if err != nil {
-		return -1, err
+		return -1, false, err
 	}
 	b.r1.Assign(immediateByte)
-	return 8, nil
+	return 8, false, nil
 }
 
 type Ld16BitImmediateOpCode struct {
@@ -76,11 +76,53 @@ type Ld16BitImmediateOpCode struct {
 	r1 *Register16Bit
 }
 
-func (b *Ld16BitImmediateOpCode) Run(cpu *Cpu) (int, error) {
+func (b *Ld16BitImmediateOpCode) Run(cpu *Cpu) (int, bool, error) {
 	immediateData, err := cpu.LoadImmediateWord()
 	if err != nil {
-		return -1, err
+		return -1, false, err
 	}
 	b.r1.Assign(immediateData)
-	return 12, nil
+	return 12, false, nil
+}
+
+
+type IncRegOpCode struct {
+	BaseOpCode
+	r1 *Register8Bit
+}
+
+func (b *IncRegOpCode) Run(cpu *Cpu) (int, bool, error) {
+	zero, halfCarry := b.r1.Increment()
+	cpu.SetFlag(Z, zero)
+	cpu.SetFlag(H, halfCarry)
+	cpu.SetFlag(N, false)
+	return 4, false, nil
+}
+
+type IncMemOpCode struct {
+	BaseOpCode
+	r1 *Register16Bit
+}
+
+func (b *IncMemOpCode) Run(cpu *Cpu) (int, bool, error) {
+	_, err := cpu.memory.Get(b.r1.Retrieve())
+	if err != nil {
+		return -1, false, err
+	}
+
+	// TODO: set flags properly
+	panic("Unimplemented!")
+}
+
+type DecRegOpCode struct {
+	BaseOpCode
+	r1 *Register8Bit
+}
+
+func (b *DecRegOpCode) Run(cpu *Cpu) (int, bool, error) {
+	zero, halfCarry := b.r1.Decrement()
+	cpu.SetFlag(Z, zero)
+	cpu.SetFlag(H, halfCarry)
+	cpu.SetFlag(N, true)
+	return 4, false, nil
 }
