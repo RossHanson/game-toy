@@ -20,13 +20,13 @@ type LdRegIntoMemOpCode struct {
 }
 
 func (b *LdRegIntoMemOpCode) Run(cpu *Cpu) (int, error) {
-	destLsb, destMsb := b.r1.Retrieve()
-	cpu.memory.Set(destLsb, destMsb, b.r2.Retrieve())
+	dest := b.r1.Retrieve()
+	cpu.memory.Set(dest, b.r2.Retrieve())
 	if b.incrementR1 {
-		// TODO: figure out register increments
+		b.r1.Increment()
 	}
 	if b.decrementR1 {
-		// TODO: figure out register decrements
+		b.r1.Decrement()
 	}
 	return 8, nil
 }
@@ -40,17 +40,17 @@ type LdMemIntoRegOpCode struct {
 }
 
 func (b *LdMemIntoRegOpCode) Run(cpu *Cpu) (int, error) {
-	srcLsb, srcMsb := b.r2.Retrieve()
-	val, err := cpu.memory.Get(srcLsb, srcMsb)
+	src := b.r2.Retrieve()
+	val, err := cpu.memory.Get(src)
 	if err != nil {
 		return -1, err
 	}
 
 	if b.incrementR2 {
-		// TODO: figure out register increments
+		b.r2.Increment()
 	}
 	if b.decrementR2 {
-		// TODO: figure out register decrements
+		b.r2.Decrement()
 	}
 
 	b.r1.Assign(val)
@@ -63,10 +63,24 @@ type Ld8BitImmediateOpCode struct {
 }
 
 func (b *Ld8BitImmediateOpCode) Run(cpu *Cpu) (int, error) {
-	immediateData, err := cpu.LoadImmediateData(b.length - 1)
+	immediateByte, err := cpu.LoadImmediateByte()
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
-	b.r1.Assign(immediateData[0])
+	b.r1.Assign(immediateByte)
 	return 8, nil
+}
+
+type Ld16BitImmediateOpCode struct {
+	BaseOpCode
+	r1 *Register16Bit
+}
+
+func (b *Ld16BitImmediateOpCode) Run(cpu *Cpu) (int, error) {
+	immediateData, err := cpu.LoadImmediateWord()
+	if err != nil {
+		return -1, err
+	}
+	b.r1.Assign(immediateData)
+	return 12, nil
 }

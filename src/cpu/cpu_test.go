@@ -3,7 +3,7 @@ package cpu
 import (
 	"testing"
 	"memory"
-	"utils"
+	"types"
 )
 
 const (
@@ -51,7 +51,7 @@ func TestLdOpCode_registerToRegister(t *testing.T) {
 	}
 	// Verify memory was not updated
 	for address := 0; address < mockMemorySize; address++ {
-		memoryByte, _ := memory.GetInt(address)
+		memoryByte, _ := memory.Get(types.Word(address))
 		if memoryByte != 0 {
 			t.Errorf("Memory updated inappropriately, want: 0x00, got: %x",
 				memoryByte)
@@ -63,11 +63,10 @@ func TestLdOpCode_registerToRegister(t *testing.T) {
 func TestLdMemoryRead(t *testing.T) {
 	cpu, memory := setupCpu()
 	cpu.A.Assign(0)
-	memoryAddress := 0x33
-	addressLsb, addressMsb := utils.EncodeInt(memoryAddress)
-	cpu.BC.Assign(addressLsb, addressMsb)
+	memoryAddress := types.Word(0x33)
+	cpu.BC.Assign(memoryAddress)
 
-	memory.Set(addressLsb, addressMsb, byte(0x12))
+	memory.Set(memoryAddress, byte(0x12))
 
 	opcode := LdMemIntoRegOpCode{
 		r1: &cpu.A,
@@ -88,68 +87,93 @@ func TestLdMemoryRead(t *testing.T) {
 		t.Errorf("R1 not set properly, want: 0x12, got: %x", r1Val)
 	}
 
-	r2Lsb, r2Msb := cpu.BC.Retrieve()
-	if utils.CompareByteArrays([]byte{addressLsb, addressMsb}, []byte{r2Lsb, r2Msb}) != 0 {
-		t.Errorf("R2 modified, want: %x, got: %x", []byte{addressLsb, addressMsb}, []byte{r2Lsb, r2Msb})
+	r2Val := cpu.BC.Retrieve()
+	if r2Val != memoryAddress {
+		t.Errorf("R2 modified, want: %s, got: %s", memoryAddress, r2Val)
 	}
 }
 
 func TestLdMemorySet(t *testing.T) {
-	cpu, memory := setupCpu()
-	cpu.A.Assign(byte(0x45))
-	memoryAddress := 0x18
-	addressLsb, addressMsb := utils.EncodeInt(memoryAddress)
-	cpu.DE.Assign(addressLsb, addressMsb)
-	memory.Set(addressLsb, addressMsb, byte(0x00)) // Explicitly zero out that address
-
-	opcode := &LdRegIntoMemOpCode{
-		r1: &cpu.DE,
-		r2: &cpu.A,
+	testCases := []struct{
+		name string
+		isIncrement bool
+		isDecrement bool
+	} {
+		{
+			name: "Normal load",
+		},
+		{
+			name: "Post load increment",
+			isIncrement: true,
+		},
+		{
+			name: "Post load decrement",
+			isDecrement: true,
+		},
 	}
 
-	cycles, err := opcode.Run(cpu)
-	if err != nil {
-		t.Fatalf("Error running opcode: %v", err)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cpu, memory := setupCpu()
+			memoryAddress := types.Word(0x18)
+			memory.Set(memoryAddress, byte(0x00)) // Explicitly zero out
 
-	if cycles != 8 {
-		t.Errorf("Incorrect number of cycles returned, want: 8, got: %d", cycles)
-	}
+			cpu.A.Assign(byte(0x45))
+			cpu.DE.Assign(memoryAddress)
 
-	memoryValue, err := memory.Get(addressLsb, addressMsb)
-	if err != nil {
-		t.Fatalf("Error reading memory at %x: %v", []byte{addressLsb, addressMsb}, err)
-	}
-	
-	if memoryValue != byte(0x45) {
-		t.Errorf("Incorrect value in memory, want: 0x45, got: %x", memoryValue)
-	}
+			opCode := &LdRegIntoMemOpCode{
+				r1: &cpu.DE,
+				r2: &cpu.A,
+				incrementR1: tc.isIncrement,
+				decrementR1: tc.isDecrement,
+			}
 
-	r1Val := cpu.A.Retrieve()
-	if r1Val != byte(0x45) {
-		t.Errorf("R1 value modified, want: 0x45, got: %x", r1Val)
-	}
+			cycles, err := opCode.Run(cpu)
+			if err != nil {
+				t.Fatalf("Error running test: %v", err)
+			}
+			if cycles != 8 {
+				t.Errorf("Incorrect number of cycles, want: 8, got: %d", cycles)
+			}
 
-	r2Lsb, r2Msb := cpu.DE.Retrieve()
-	if utils.CompareByteArrays([]byte{addressLsb, addressMsb}, []byte{r2Lsb, r2Msb}) != 0 {
-		t.Errorf("R2 modified, want: %x, got: %x", []byte{addressLsb, addressMsb}, []byte{r2Lsb, r2Msb})
+			memoryValue, err := memory.Get(memoryAddress)
+			if err != nil {
+				t.Fatalf("Error fetching memory at %s: %v", memoryAddress, err)
+			}
+			if memoryValue != byte(0x45) {
+				t.Errorf("Incorrect memory value, want: 0x45, got: %x", memoryValue)
+			}
+
+			r1Val := cpu.A.Retrieve()
+			if r1Val != byte(0x45) {
+				t.Errorf("R1 value modified, want: 0x45, got: %x", r1Val)
+			}
+
+			r2Val := cpu.DE.Retrieve()
+			expectedValue := memoryAddress
+			if tc.isIncrement {
+				expectedValue += types.Word(1)
+			} else if tc.isDecrement {
+				expectedValue -= types.Word(1)
+			}
+			if r2Val != expectedValue {
+				t.Errorf("R2 val incorrect, want: %s, got: %s", expectedValue, r2Val)
+			}
+		})
 	}
 }
 
-func TestLdImmediateOpCode(t *testing.T) {
+func TestLdImmediateByteOpCode(t *testing.T) {
 	cpu, memory := setupCpu()
 
-	pcAddress := 0x24
-	addressLsb, addressMsb := utils.EncodeInt(pcAddress)
-	cpu.PC.Assign(addressLsb, addressMsb)
+	pcAddress := types.Word(0x24)
+	cpu.PC.Assign(pcAddress)
 
-	memory.SetInt(pcAddress + 1, 0xDE)
-	memory.SetInt(pcAddress + 2, 0xAD)
+	memory.Set(pcAddress + 1, 0xDE)
 
 	opCode := &Ld8BitImmediateOpCode{
 		r1: &cpu.A,
 	}
-	opCode.length = 2
 
 	cycles, err := opCode.Run(cpu)
 	if err != nil {
@@ -163,5 +187,31 @@ func TestLdImmediateOpCode(t *testing.T) {
 	r1Val := cpu.A.Retrieve()
 	if r1Val != byte(0xDE) {
 		t.Errorf("R1 modified, want: 0xDE, got: %x", r1Val)
+	}
+}
+
+func TestLdImmediateWordOpCode(t *testing.T) {
+	cpu, memory := setupCpu()
+
+	pcAddress := types.Word(0x32)
+	cpu.PC.Assign(pcAddress)
+	memory.Set(pcAddress + 1, 0xBE)
+	memory.Set(pcAddress + 2, 0xEF)
+
+	opCode := &Ld16BitImmediateOpCode{
+		r1: &cpu.DE,
+	}
+	cycles, err := opCode.Run(cpu)
+	if err != nil {
+		t.Fatalf("Error running opcode: %v", err)
+	}
+
+	if cycles != 12 {
+		t.Errorf("Incorrect number of cycles, want: 12, got: %d", cycles)
+	}
+
+	r1Val := cpu.DE.Retrieve()
+	if r1Val != types.WordFromBytes(0xBE, 0xEF) {
+		t.Errorf("Incorrect r1val, want: 0xBEEF, got: %s", r1Val)
 	}
 }
