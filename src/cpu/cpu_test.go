@@ -144,40 +144,58 @@ func TestLdImmediateOpCode(t *testing.T) {
 	pcAddress := 0x24
 	pcAddressBytes := utils.EncodeInt(pcAddress)
 	cpu.programCounter.Assign(pcAddressBytes...)
-	cpu.registers["A"].Assign(byte(0x5)) // to be overwritten
+
 	memory.SetInt(pcAddress + 1, 0xDE)
 	memory.SetInt(pcAddress + 2, 0xAD)
-
-	opCode := &LdImmediateOpCode{
-		r1: "A",
-	}
-	opCode.length = 2
 	
-	cycles, err := opCode.Run(cpu)
-	if err != nil {
-		t.Fatalf("Error running opcode: %v", err)
+	testCases := []struct{
+		name string
+		r1 RegisterName
+		length int
+		expectedCycles int
+		expectedRegisterValue []byte
+	} {
+		{
+			name: "8 bit register",
+			r1: "A",
+			length: 2,
+			expectedCycles: 8,
+			expectedRegisterValue: []byte{byte(0xDE)},
+		},
+		{
+			name: "16 bit register",
+			r1: "BC",
+			length: 3,
+			expectedCycles: 12,
+			expectedRegisterValue: []byte{byte(0xDE), byte(0xAD)},
+		},
 	}
 
-	if cycles != 8 {
-		t.Errorf("Incorrect number of cycles returned, want: 8, got: %d", cycles)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opCode := &LdImmediateOpCode{
+				r1: tc.r1,
+			}
+			opCode.length = tc.length
 
-	r1Val := cpu.registers["A"].Retrieve()[0]
-	if r1Val != byte(0xDE) {
-		t.Errorf("Incorrect R1 value, want: 0xDE, got: %x", r1Val)
-	}
+			cycles, err := opCode.Run(cpu)
+			if err != nil {
+				t.Fatalf("Error running opcode: %v", err)
+			}
 
-	pcValue := cpu.programCounter.Retrieve()
-	if utils.CompareByteArrays(pcAddressBytes, pcValue) != 0 {
-		t.Errorf("PC was incorrectly updated, want: %x, got: %x", pcAddressBytes, pcValue)
-	}
+			if cycles != tc.expectedCycles {
+				t.Errorf("Incorrect number of cycles, want: %d, got: %d", tc.expectedCycles, cycles)
+			}
 
-	memoryValue, err := memory.GetInt(pcAddress + 1)
-	if err != nil {
-		t.Fatalf("Error fetching from memory at address %x: %v", pcAddress + 1, err)
-	}
-	
-	if memoryValue != byte(0xDE) {
-		t.Errorf("Memory incorrectly updated, want: 0xDE, got: %x", memoryValue)
+			r1Val := cpu.registers[tc.r1].Retrieve()
+			if utils.CompareByteArrays(r1Val, tc.expectedRegisterValue) != 0 {
+				t.Errorf("R1 modified, want: %x, got: %x", r1Val, tc.expectedRegisterValue)
+			}
+
+			pcValue := cpu.programCounter.Retrieve()
+			if utils.CompareByteArrays(pcValue, pcAddressBytes) != 0 {
+				t.Errorf("PC was incorrectly updated, want: %x, got: %x", pcAddressBytes, pcValue)
+			}
+		})
 	}
 }
