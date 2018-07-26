@@ -1,11 +1,11 @@
 package cpu
 
 import (
-	"fmt"
 	"memory"
 	"log"
 	"encoding/binary"
 	"utils"
+	"fmt"
 )
 
 type RegisterName string
@@ -26,41 +26,50 @@ type OpCode interface {
 	Length() int
 }
 
-type Register struct {
-	Name RegisterName
-	value []*byte
+type Register8Bit struct {
+	Name string
+	value byte
 }
 
-func (r *Register) Assign(value ...byte) error {
-	if len(r.value) != len(value) {
-		return fmt.Errorf("Attempted to assign a %d bit value to a %d bit register", 8*len(value), 8*len(r.value))
-	}
+type Register16Bit struct {
+	Name string
+	lsb *byte
+	msb *byte
+}
+
+func (r *Register8Bit) Assign(value byte) {
 	log.Printf("Assigning value %x into %s", value, r.Name)
-	for index, val := range value {
-		*r.value[index] = val
-	}
-	return nil
+	r.value = value
 }
 
-func (r *Register) Retrieve() []byte {
-	result := make([]byte, len(r.value))
-	for index, val := range r.value {
-		result[index] = *val
-	}
-	return result
+func (r *Register8Bit) Retrieve() byte {
+	return r.value
 }
 
-func (r *Register) is8Bit() bool {
-	return len(r.value) == 1
+func (r *Register16Bit) Assign(lsb byte, msb byte) {
+	*r.lsb = lsb
+	*r.msb =  msb
+}
+
+func (r *Register16Bit) Retrieve() (lsb byte, msb byte) {
+	return *r.lsb, *r.msb
+}
+
+func (r *Register8Bit) Increment() (zero bool, halfCarry bool) {
+	// This could probably be more efficient
+	//val := UInt8(r.value)
+	//val++
+	//r.value = byte(val)
+	// TODO figure out return types
+	return false, false
+	//return val == 0, false
 }
 
 type Cpu struct {
 	// more fields to come
 	memory *memory.Memory
-	registers map[RegisterName]*Register
-	programCounter *Register
-	stackPointer *Register
-	flagRegister *Register
+	A, B, C, D, E, F, H, L Register8Bit
+	BC, DE, HL, SP, PC Register16Bit
 }
 
 type BaseOpCode struct {
@@ -84,50 +93,45 @@ func (b BaseOpCode) Length() int {
 
 // Initializes a default CPU
 func NewCpu(memory *memory.Memory) (*Cpu) {
-	registerMap := make(map[RegisterName]*Register)
-	for _, registerName := range registers8Bit {
-		var value byte
-		registerMap[registerName] = &Register{
-			Name: registerName,
-			value: []*byte{&value},
-		}
-	}
-
-	for _, registerName := range registers16Bit {
-		var value1 byte
-		var value2 byte
-		registerMap[registerName] = &Register{
-			Name: registerName,
-			value: []*byte{&value1, &value2},
-		}
-	}
-
-	for _, registerName := range combinationRegisters {
-		register1 := registerMap[RegisterName(registerName[0])]
-		register2 := registerMap[RegisterName(registerName[1])]
-		registerMap[registerName] = &Register{
-			Name: registerName,
-			value: []*byte{register1.value[0], register2.value[0]},
-		}
-	}
-
-	return &Cpu{
+	cpu := &Cpu{
 		memory: memory,
-		registers: registerMap,
-		programCounter: registerMap["PC"],
-		stackPointer: registerMap["SP"],
-		flagRegister: registerMap["FR"],
 	}
+
+	cpu.A.Name = "A"
+	cpu.B.Name = "B"
+	cpu.C.Name = "C"
+	cpu.D.Name = "D"
+	cpu.E.Name = "E"
+	cpu.F.Name = "F"
+
+	setupMixedRegister := func(mixed *Register16Bit, lsb *Register8Bit, msb *Register8Bit) {
+		mixed.lsb = &lsb.value
+		mixed.msb = &msb.value
+		mixed.Name = lsb.Name + msb.Name
+	}
+
+	setupMixedRegister(&cpu.BC, &cpu.B, &cpu.C)
+	setupMixedRegister(&cpu.DE, &cpu.D, &cpu.E)
+	setupMixedRegister(&cpu.HL, &cpu.H, &cpu.L)
+
+	var spLsb, spMsb, pcLsb, pcMsb byte
+
+	cpu.SP.lsb = &spLsb
+	cpu.SP.msb = &spMsb
+	cpu.PC.lsb = &pcLsb
+	cpu.PC.msb = &pcMsb
+
+	return cpu
 }
-
-
 
 func (c *Cpu) LoadImmediateData(length int) ([]byte, error) {
 	data := make([]byte, length)
-	pc := binary.LittleEndian.Uint16(c.programCounter.Retrieve())
+	pcValLsb, pcValMsb := c.PC.Retrieve()
+	pc := binary.LittleEndian.Uint16([]byte{pcValLsb, pcValMsb})
 	pc++ // skip 1 for the current instruction
 	for offset := 0; offset < length; offset++ {
-		memoryValue, err := c.memory.Get(utils.EncodeInt(int(pc) + offset))
+		lsb, msb := utils.EncodeInt(int(pc) + offset)
+		memoryValue, err := c.memory.Get(lsb, msb)
 		if err != nil {
 			return nil, err
 		}

@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"encoding/binary"
 )
 
@@ -18,12 +17,9 @@ func (s *Memory) Size() int {
 	return len(s.memory)
 }
 
-func (s *Memory) Get(address []byte) (byte, error) {
+func (s *Memory) Get(lsb byte, msb byte) (byte, error) {
 	// No bounds checking is done here
-	if len(address) != 2 {
-		return 0x00, fmt.Errorf("addresses must be 16 bits")
-	}
-	uintAddress := binary.LittleEndian.Uint16(address)
+	uintAddress := binary.LittleEndian.Uint16([]byte{lsb, msb})
 	return s.memory[int(uintAddress)], nil
 }
 
@@ -32,11 +28,8 @@ func (s *Memory) GetInt(address int) (byte, error) {
 	return s.memory[address], nil 
 }
 
-func (s *Memory) Set(address []byte, value byte) error {
-	if len(address) != 2 {
-		return fmt.Errorf("addresses must be 16 bits")
-	}
-	uintAddress := binary.LittleEndian.Uint16(address)
+func (s *Memory) Set(lsb byte, msb byte, value byte) error {
+	uintAddress := binary.LittleEndian.Uint16([]byte{lsb, msb})
 	s.memory[int(uintAddress)] = value
 	return nil
 }
