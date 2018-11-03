@@ -18,6 +18,7 @@
 **** TODO Jumps
 **** TODO Push/pop
 **** TODO CB operations (note (HL) instructions only take 12!!)
+*** TODO OpCode dispatcher/generator
 ** Op code execution
 * Setting up project
 ** DONE Split out modules into directories (ugh)

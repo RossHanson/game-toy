@@ -291,7 +291,7 @@ func TestIncRegOpCodes(t *testing.T) {
 	}
 }
 
-func TestIncMemOpCodes(t *testing.T) {
+func testIncMemOpCodes(t *testing.T) {
 	testCases := []struct{
 		name string
 		memoryAddress types.Word
@@ -427,5 +427,34 @@ func TestDecOpCode(t *testing.T) {
 				t.Errorf("Incorrect subtract flag, want: false, got: true")
 			}
 		})
+	}
+}
+
+func TestGenerateOpCodes(t *testing.T) {
+	cpu, _ := setupCpu()
+	codes := cpu.code
+
+	if code, exists := codes[0x41]; !exists {
+		t.Errorf("Could not find expected opcode")
+	} else {
+		if code.Name() != "LD B,C" {
+			t.Errorf("Code name incorrect, want: 'LD B,C, got: %s", code.Name())
+		}
+		ldOpCode, ok := code.(*Ld8BitRegisterOpCode)
+		if !ok {
+			t.Fatalf("Opcode was of incorrect type, want: *Ld8BitRegisterOpCode, got: %T", ldOpCode)
+		}
+
+		if ldOpCode.r1 == nil {
+			t.Errorf("Opcode R1 not set, want: B, got: nil")
+		} else if ldOpCode.r1 != &cpu.B {
+			t.Errorf("Incorrect R1 for opcode, want: B, got: %s", ldOpCode.r1.Name)
+		}
+
+		if ldOpCode.r1 == nil {
+			t.Errorf("Opcode R2 not set, want: C, got: nil")
+		} else if ldOpCode.r2 != &cpu.C {
+			t.Errorf("Incorrect R2 for opcdoe, want: C, got: %s", ldOpCode.r2.Name)
+		}
 	}
 }

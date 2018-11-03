@@ -21,7 +21,6 @@ type OpCode interface {
 	Run(cpu *Cpu) (cycles int, pcModified bool, err error)
 	Name() string
 	DebugString() string
-	Cycles() int
 	Length() int
 }
 
@@ -113,6 +112,7 @@ type Cpu struct {
 	memory *memory.Memory
 	A, B, C, D, E, F, H, L Register8Bit
 	AF, BC, DE, HL, SP, PC Register16Bit
+	code map[byte]OpCode
 }
 
 type BaseOpCode struct {
@@ -165,6 +165,8 @@ func NewCpu(memory *memory.Memory) (*Cpu) {
 	cpu.PC.lsb = &pcLsb
 	cpu.PC.msb = &pcMsb
 
+	cpu.codes = cpu.generateOpCodes()
+
 	return cpu
 }
 
@@ -215,4 +217,145 @@ func (c *Cpu) GetFlag(flag int) bool {
 		log.Fatalf("Unknown flag: %c", flag)
 		return false // think I need this for the compiler
 	}
+}
+
+func (c *Cpu) generateOpCodes() map[byte]OpCode {
+	codes := make(map[byte]OpCode)
+	// 8 bit ld op codes
+	{
+		// Order of source registers
+		sourceRegisters := []*Register8Bit{
+			&c.B, &c.C, &c.D, &c.H, &c.L, nil,
+			&c.A, &c.B, &c.C, &c.D, &c.E, &c.H,
+			&c.L, nil, &c.A}
+		destRegisters := []*Register8Bit{
+			&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, nil,
+			&c.A}
+
+		codeMsb := 0x04
+		codeLsb := 0x00
+
+		for _, destRegister := range destRegisters {
+			for _, srcRegister := range sourceRegisters {
+				code := byte(codeLsb + (codeMsb * 16))
+				codeLsb++
+				if srcRegister == nil || destRegister == nil {
+					continue
+				}
+				op := &Ld8BitRegisterOpCode{
+					BaseOpCode: BaseOpCode{
+						name: fmt.Sprintf("LD %s,%s", destRegister.Name, srcRegister.Name),
+						code: code,
+						length: 1,
+					},
+					r1: destRegister,
+					r2: srcRegister,
+				}
+				codes[code] = op
+			}
+			codeMsb++
+		}
+	}
+	// 8 bit immediate loads
+	{
+		// Map of code LSB to dest registers
+		lsbToDestRegisters := map[int][]*Register8Bit{
+			0x6: {&c.B, &c.D, &c.H},
+			0xE: {&c.C, &c.E, &c.L, &c.A},
+		}
+		for codeLsb, destRegisters := range lsbToDestRegisters {
+			codeMsb := 0x0
+			for _, destRegister := range destRegisters {
+				code := byte(codeLsb + (codeMsb * 16))
+				codeMsb++
+				op := &Ld8BitImmediateOpCode{
+					BaseOpCode: BaseOpCode{
+						name: fmt.Sprintf("LD %s,d8", destRegister.Name),
+						code: code,
+						length: 2,
+					},
+					r1: destRegister,
+				}
+				codes[code] = op
+			}
+		}
+	}
+
+	// Reg into memory loads for BC and DE
+	{
+		srcRegisters := []*Register16Bit{&c.BC, &c.DE}
+		codeLsb := 0x2
+		codeMsb := 0x0
+		for _, srcRegister := range destRegisters {
+			code := byte(codeLsb + (codeMsb * 16))
+			codeMsb++
+			codes[code] = &LdRegIntoMemOpCode{
+				BaseOpCode: BaseOpCode{
+					name: fmt.Sprintf("LD (%s),A", destRegister.Name),
+					code: code,
+					length: 1,
+				},
+				r1: srcRegister,
+				r2: &c.A,
+			}
+		}
+	}
+
+	// Reg into memory loads for HL
+	{
+		srcRegisters := []*Register8Bit{&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, nil, &c.A}
+		codeLsb := 0x0
+		codeMsb := 0x7
+		for _, srcRegister := range srcRegisters {
+			code := byte(codeLsb + (codeMsb * 16))
+			codeLsb++
+			if srcRegister == nil {
+				continue
+			}
+			codes[code] = &LdRegIntoMemOpCode{
+				BaseOpCode: BaseOpCode{
+					name: fmt.Sprintf("LD (HL),%s", srcRegisters.Name)
+					code: code,
+					length: 1,
+				},
+				r1: &c.HL,
+				r2: srcRegister,
+			}
+		}
+	}
+
+	// Reg into memory loads for HL+
+	{
+		code := 0x22
+		codes[code] = &LdRegIntoMemOpCode{
+			BaseOpCode: BaseOpCode{
+				name: "LD (HL+),A",
+				code: code,
+				length: 1,
+			},
+			incrementR1: true,
+			r1: &c.HL,
+			r2: &c.A,
+		}
+	}
+
+	// Reg into memory loads for HL-
+	{
+		codes[code] = &LdRegIntoMemOpCode{
+			BaseOpCode: BaseOpCode{
+				name: "LD (HL-),A",
+				code: code,
+				length: 1,
+			},
+			decrementR1: true,
+			r1: &c.HL,
+			r2: &c.A,
+		}
+	}
+
+	
+		
+		
+	}
+	return codes
 }
