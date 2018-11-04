@@ -112,7 +112,7 @@ type Cpu struct {
 	memory *memory.Memory
 	A, B, C, D, E, F, H, L Register8Bit
 	AF, BC, DE, HL, SP, PC Register16Bit
-	code map[byte]OpCode
+	codes map[byte]OpCode
 }
 
 type BaseOpCode struct {
@@ -225,17 +225,14 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 	{
 		// Order of source registers
 		sourceRegisters := []*Register8Bit{
-			&c.B, &c.C, &c.D, &c.H, &c.L, nil,
-			&c.A, &c.B, &c.C, &c.D, &c.E, &c.H,
-			&c.L, nil, &c.A}
+			&c.B, &c.C, &c.D, &c.H, &c.L, nil, &c.A}
 		destRegisters := []*Register8Bit{
-			&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, nil,
-			&c.A}
+			&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, &c.A}
 
 		codeMsb := 0x04
 		codeLsb := 0x00
 
-		for _, destRegister := range destRegisters {
+		for index, destRegister := range destRegisters {
 			for _, srcRegister := range sourceRegisters {
 				code := byte(codeLsb + (codeMsb * 16))
 				codeLsb++
@@ -253,7 +250,9 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 				}
 				codes[code] = op
 			}
-			codeMsb++
+			if index % 2 == 1 {
+				codeMsb++
+			}
 		}
 	}
 	// 8 bit immediate loads
@@ -281,17 +280,30 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		}
 	}
 
+	// Memory immediate load
+	{
+		code := byte(0x36)
+		codes[code] = &LdMemoryImmediateOpCode{
+			BaseOpCode: BaseOpCode {
+				name: "LD (HL),d8",
+				code: code,
+				length: 2,
+			},
+			r1: &c.HL,
+		}
+	}
+
 	// Reg into memory loads for BC and DE
 	{
 		srcRegisters := []*Register16Bit{&c.BC, &c.DE}
 		codeLsb := 0x2
 		codeMsb := 0x0
-		for _, srcRegister := range destRegisters {
+		for _, srcRegister := range srcRegisters {
 			code := byte(codeLsb + (codeMsb * 16))
 			codeMsb++
 			codes[code] = &LdRegIntoMemOpCode{
 				BaseOpCode: BaseOpCode{
-					name: fmt.Sprintf("LD (%s),A", destRegister.Name),
+					name: fmt.Sprintf("LD (%s),A", srcRegister.Name),
 					code: code,
 					length: 1,
 				},
@@ -314,7 +326,7 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 			}
 			codes[code] = &LdRegIntoMemOpCode{
 				BaseOpCode: BaseOpCode{
-					name: fmt.Sprintf("LD (HL),%s", srcRegisters.Name)
+					name: fmt.Sprintf("LD (HL),%s", srcRegister.Name),
 					code: code,
 					length: 1,
 				},
@@ -326,7 +338,7 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 
 	// Reg into memory loads for HL+
 	{
-		code := 0x22
+		code := byte(0x22)
 		codes[code] = &LdRegIntoMemOpCode{
 			BaseOpCode: BaseOpCode{
 				name: "LD (HL+),A",
@@ -341,6 +353,7 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 
 	// Reg into memory loads for HL-
 	{
+		code := byte(0x32)
 		codes[code] = &LdRegIntoMemOpCode{
 			BaseOpCode: BaseOpCode{
 				name: "LD (HL-),A",
@@ -353,9 +366,80 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		}
 	}
 
-	
-		
-		
+	// Memory into reg for BC and DE
+	{
+		codeMsb := 0x0
+		codeLsb := 0xA
+		srcRegisters := []*Register16Bit{&c.BC, &c.DE}
+		for _, srcRegister := range srcRegisters {
+			code := byte(codeLsb + 16 * codeMsb)
+			codeMsb++
+			codes[code] = &LdMemIntoRegOpCode{
+				BaseOpCode: BaseOpCode{
+					name: fmt.Sprintf("LD A,(%s)", srcRegister.Name),
+					code: code,
+					length: 1,
+				},
+				r1: &c.A,
+				r2: srcRegister,
+			}
+		}
 	}
+
+	// Memory into reg for regular HL
+	{
+		lsbToRegisters := map[int][]*Register8Bit{
+			0x6: {&c.B, &c.D, &c.H},
+			0xE: {&c.C, &c.E, &c.L, &c.A},
+		}
+		for codeLsb, destRegisters := range lsbToRegisters {
+			codeMsb := 0x4
+			for _, destRegister := range destRegisters {
+				code := byte(codeLsb + 16 * codeMsb)
+				codeMsb++
+				codes[code] = &LdMemIntoRegOpCode{
+					BaseOpCode: BaseOpCode{
+						name: fmt.Sprintf("LD %s,(HL)"),
+						code: code,
+						length: 1,
+					},
+					r1: destRegister,
+					r2: &c.HL,
+				}
+			}
+		}
+	}
+
+	// LD A,(HL+)
+	{
+		code := byte(0x2A)
+		codes[code] = &LdMemIntoRegOpCode{
+			BaseOpCode: BaseOpCode{
+				name: "LD A,(HL+)",
+				code: code,
+				length: 1,
+			},
+			r1: &c.A,
+			r2: &c.HL,
+			incrementR2: true,
+		}
+	}
+
+	// LD A,(HL-)
+	{
+		code := byte(0x3A)
+		codes[code] = &LdMemIntoRegOpCode{
+			BaseOpCode: BaseOpCode{
+				name: "LD A,(HL-)",
+				code: code,
+				length: 1,
+			},
+			r1: &c.A,
+			r2: &c.HL,
+			decrementR2: true,
+		}
+	}
+
+	
 	return codes
 }

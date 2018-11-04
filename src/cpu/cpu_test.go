@@ -432,7 +432,7 @@ func TestDecOpCode(t *testing.T) {
 
 func TestGenerateOpCodes(t *testing.T) {
 	cpu, _ := setupCpu()
-	codes := cpu.code
+	codes := cpu.codes
 
 	if code, exists := codes[0x41]; !exists {
 		t.Errorf("Could not find expected opcode")
