@@ -3,7 +3,6 @@ package cpu
 import (
 	"memory"
 	"log"
-	"fmt"
 	"types"
 )
 
@@ -20,7 +19,6 @@ type OpCode interface {
 	// or an error if one occurs.
 	Run(cpu *Cpu) (cycles int, pcModified bool, err error)
 	Name() string
-	DebugString() string
 	Length() int
 }
 
@@ -116,17 +114,8 @@ type Cpu struct {
 }
 
 type BaseOpCode struct {
-	name string
 	code byte
 	length int
-}
-
-func (b BaseOpCode) Name() string {
-	return b.name
-}
-
-func (b BaseOpCode) DebugString() string {
-	return fmt.Sprintf("%x - %s", b.code, b.name)
 }
 
 func (b BaseOpCode) Length() int {
@@ -241,7 +230,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 				}
 				op := &Ld8BitRegisterOpCode{
 					BaseOpCode: BaseOpCode{
-						name: fmt.Sprintf("LD %s,%s", destRegister.Name, srcRegister.Name),
 						code: code,
 						length: 1,
 					},
@@ -269,7 +257,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 				codeMsb++
 				op := &Ld8BitImmediateOpCode{
 					BaseOpCode: BaseOpCode{
-						name: fmt.Sprintf("LD %s,d8", destRegister.Name),
 						code: code,
 						length: 2,
 					},
@@ -285,7 +272,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		code := byte(0x36)
 		codes[code] = &LdMemoryImmediateOpCode{
 			BaseOpCode: BaseOpCode {
-				name: "LD (HL),d8",
 				code: code,
 				length: 2,
 			},
@@ -303,7 +289,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 			codeMsb++
 			codes[code] = &LdRegIntoMemOpCode{
 				BaseOpCode: BaseOpCode{
-					name: fmt.Sprintf("LD (%s),A", srcRegister.Name),
 					code: code,
 					length: 1,
 				},
@@ -326,7 +311,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 			}
 			codes[code] = &LdRegIntoMemOpCode{
 				BaseOpCode: BaseOpCode{
-					name: fmt.Sprintf("LD (HL),%s", srcRegister.Name),
 					code: code,
 					length: 1,
 				},
@@ -341,7 +325,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		code := byte(0x22)
 		codes[code] = &LdRegIntoMemOpCode{
 			BaseOpCode: BaseOpCode{
-				name: "LD (HL+),A",
 				code: code,
 				length: 1,
 			},
@@ -356,7 +339,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		code := byte(0x32)
 		codes[code] = &LdRegIntoMemOpCode{
 			BaseOpCode: BaseOpCode{
-				name: "LD (HL-),A",
 				code: code,
 				length: 1,
 			},
@@ -376,7 +358,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 			codeMsb++
 			codes[code] = &LdMemIntoRegOpCode{
 				BaseOpCode: BaseOpCode{
-					name: fmt.Sprintf("LD A,(%s)", srcRegister.Name),
 					code: code,
 					length: 1,
 				},
@@ -399,7 +380,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 				codeMsb++
 				codes[code] = &LdMemIntoRegOpCode{
 					BaseOpCode: BaseOpCode{
-						name: fmt.Sprintf("LD %s,(HL)"),
 						code: code,
 						length: 1,
 					},
@@ -415,7 +395,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		code := byte(0x2A)
 		codes[code] = &LdMemIntoRegOpCode{
 			BaseOpCode: BaseOpCode{
-				name: "LD A,(HL+)",
 				code: code,
 				length: 1,
 			},
@@ -430,7 +409,6 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		code := byte(0x3A)
 		codes[code] = &LdMemIntoRegOpCode{
 			BaseOpCode: BaseOpCode{
-				name: "LD A,(HL-)",
 				code: code,
 				length: 1,
 			},

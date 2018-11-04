@@ -10,17 +10,6 @@ const (
 	mockMemorySize = 1024 // Use smaller memory size for speed
 )
 
-func TestOpCodeName(t *testing.T) {
-	name := "Test op code"
-	testOpCode := BaseOpCode{
-		name: name,
-	}
-	if name != testOpCode.Name() {
-		t.Errorf("Name mismatch, want: %s, got: %s", name,
-			testOpCode.Name())
-	}
-}
-
 func setupCpu() (*Cpu, *memory.Memory) {
 	memory := memory.SetupBlankMemory(mockMemorySize)
 	return NewCpu(memory), memory
@@ -230,7 +219,7 @@ func TestLdImmediateWordOpCode(t *testing.T) {
 	}
 }
 
-func TestIncRegOpCodes(t *testing.T) {
+func TestInc8BitRegOpCodes(t *testing.T) {
 	testCases := []struct{
 		name string
 		inputValue byte
@@ -258,7 +247,7 @@ func TestIncRegOpCodes(t *testing.T) {
 
 			cpu.A.Assign(tc.inputValue)
 
-			opCode := &IncRegOpCode{
+			opCode := &Inc8BitRegOpCode{
 				r1: &cpu.A,
 			}
 
@@ -371,7 +360,7 @@ func testIncMemOpCodes(t *testing.T) {
 }
 
 
-func TestDecOpCode(t *testing.T) {
+func Test8BitDecOpCode(t *testing.T) {
 	testCases := []struct{
 		name string
 		inputValue byte
@@ -397,7 +386,7 @@ func TestDecOpCode(t *testing.T) {
 			cpu, _ := setupCpu()
 			cpu.A.Assign(tc.inputValue)
 
-			opCode := &DecRegOpCode{
+			opCode := &Dec8BitRegOpCode{
 				r1: &cpu.A,
 			}
 
