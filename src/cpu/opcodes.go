@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"fmt"
+	"utils"
 )
 
 type Ld8BitRegisterOpCode struct {
@@ -166,13 +167,19 @@ type IncMemOpCode struct {
 }
 
 func (b *IncMemOpCode) Run(cpu *Cpu) (int, bool, error) {
-	_, err := cpu.memory.Get(b.r1.Retrieve())
+	val, err := cpu.memory.Get(b.r1.Retrieve())
 	if err != nil {
 		return -1, false, err
 	}
-
-	// TODO: set flags properly
-	panic("Unimplemented!")
+	
+	incResults := utils.Add8Bit(val, 0x1)
+	cpu.SetFlag(Z, incResults.Zero)
+	cpu.SetFlag(H, incResults.HalfCarry)
+	cpu.SetFlag(N, false)
+	if err := cpu.memory.Set(b.r1.Retrieve(), incResults.Result); err != nil {
+		return -1, false, err
+	}
+	return 12, false, nil
 }
 
 func (b *IncMemOpCode) Name() string {
@@ -194,4 +201,30 @@ func (b *Dec8BitRegOpCode) Run(cpu *Cpu) (int, bool, error) {
 
 func (b *Dec8BitRegOpCode) Name() string {
 	return fmt.Sprintf("DEC %s", b.r1.Name)
+}
+
+type Add8BitRegOpCode struct {
+	BaseOpCode
+	r1 *Register8Bit // Should always be A
+	r2 *Register8Bit
+	includeCarry bool
+}
+
+func (b *Add8BitRegOpCode) Run(cpu *Cpu) (int, bool, error) {
+	result := utils.Add8BitWithCarry(b.r1.Retrieve(), b.r2.Retrieve(),
+		b.includeCarry && cpu.GetFlag(C))
+	b.r1.Assign(result.Result)
+	cpu.SetFlag(Z, result.Zero)
+	cpu.SetFlag(H, result.HalfCarry)
+	cpu.SetFlag(C, result.Carry)
+	cpu.SetFlag(N, false)
+	return 4, false, nil
+}
+
+func (b *Add8BitRegOpCode) Name() string {
+	base := "ADD"
+	if b.includeCarry {
+		base = "ADC"
+	}
+	return fmt.Sprintf("%s %s,%s", base, b.r1.Name, b.r2.Name)
 }

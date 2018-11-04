@@ -4,6 +4,8 @@ import (
 	"memory"
 	"log"
 	"types"
+	"fmt"
+	"utils"
 )
 
 const (
@@ -13,6 +15,21 @@ const (
 	H
 	C
 )
+
+func FlagEnumToName(flag int) string {
+	switch flag {
+	case Z:
+		return "Z"
+	case N:
+		return "N"
+	case H:
+		return "H"
+	case C:
+		return "C"
+	default:
+		return fmt.Sprintf("Unknown: %d", flag)
+	}
+}
 
 type OpCode interface {
 	// Execute the operation and return the number of cycles consumed,
@@ -34,7 +51,6 @@ type Register16Bit struct {
 }
 
 func (r *Register8Bit) Assign(value byte) {
-	log.Printf("Assigning value %x into %s", value, r.Name)
 	r.value = value
 }
 
@@ -43,14 +59,9 @@ func (r *Register8Bit) Retrieve() byte {
 }
 
 func (r *Register8Bit) Increment() (zero bool, halfCarry bool) {
-	calc := r.value + 0x01
-
-	zeroFlag := calc == 0
-	// Stole this from gnomeboycolor, not sure what it does tbh
-	halfCarryFlag := (calc^0x01^r.value)&0x10 == 0x10
-
-	r.value = calc
-	return zeroFlag, halfCarryFlag
+	result := utils.Add8Bit(r.value, 0x1)
+	r.value = result.Result
+	return result.Zero, result.HalfCarry
 }
 
 func (r *Register8Bit) Decrement() (zero bool, halfCarry bool) {
@@ -135,6 +146,8 @@ func NewCpu(memory *memory.Memory) (*Cpu) {
 	cpu.D.Name = "D"
 	cpu.E.Name = "E"
 	cpu.F.Name = "F"
+	cpu.H.Name = "H"
+	cpu.L.Name = "L"
 
 	setupMixedRegister := func(mixed *Register16Bit, lsb *Register8Bit, msb *Register8Bit) {
 		mixed.lsb = &lsb.value
@@ -418,6 +431,60 @@ func (c *Cpu) generateOpCodes() map[byte]OpCode {
 		}
 	}
 
-	
+	// ADD A,n
+	{
+		otherRegs := []*Register8Bit{&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, nil, &c.A}
+		codeMsb := 0x8
+		codeLsb := 0x0
+		for _, otherReg := range otherRegs {
+			code := byte(codeLsb + 16*codeMsb)
+			codeLsb++
+			if otherReg == nil {
+				continue
+			}
+			codes[code] = &Add8BitRegOpCode{
+				BaseOpCode: BaseOpCode{
+					code: code,
+					length: 1,
+				},
+				r1: &c.A,
+				r2: otherReg,
+			}
+		}
+	}
+
+	// ADC A,n
+	{
+		otherRegs := []*Register8Bit{&c.B, &c.C, &c.D, &c.E, &c.H, &c.L, nil, &c.A}
+		codeMsb := 0x8
+		codeLsb := 0x8
+		for _, otherReg := range otherRegs {
+			code := byte(codeLsb + 16*codeMsb)
+			codeLsb++
+			if otherReg == nil {
+				continue
+			}
+			codes[code] = &Add8BitRegOpCode{
+				BaseOpCode: BaseOpCode{
+					code: code,
+					length: 1,
+				},
+				r1: &c.A,
+				r2: otherReg,
+				includeCarry: true,
+			}
+		}
+	}
+
 	return codes
+}
+
+
+// Utility function
+func OpCodesByName(codes map[byte]OpCode) map[string]OpCode {
+	codesByName := make(map[string]OpCode)
+	for _, code := range codes {
+		codesByName[code.Name()] = code
+	}
+	return codesByName
 }

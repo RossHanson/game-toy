@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"cpu"
 	"encoding/binary"
 )
 
@@ -12,10 +11,37 @@ func EncodeInt(value int) (lsb byte, msb byte) {
 	return result[0], result[1]
 }
 
-func OpCodesByName(codes map[byte]cpu.OpCode) map[byte]cpu.OpCode {
-	codesByName := make(map[string]cpu.OpCode)
-	for _, code := range codes {
-		codesByName[code.Name()] = code
+type ArithmeticResults8Bit struct {
+	Result byte
+	Zero bool
+	HalfCarry bool
+	Carry bool
+}
+
+func Add8Bit(value1 byte, value2 byte) ArithmeticResults8Bit {
+	return Add8BitWithCarry(value1, value2, false)
+}
+
+func Add8BitWithCarry(value1 byte, value2 byte, carryBit bool) ArithmeticResults8Bit {
+	carryVal := byte(0x0)
+	if carryBit {
+		carryVal = byte(0x1)
 	}
-	return codesByName
+	sum := value1 + value2 + carryVal
+	return ArithmeticResults8Bit{
+		Result: sum,
+		Zero: sum == byte(0x0),
+		HalfCarry: (((value1 & 0xF) + (value2 & 0xF) + carryVal) & 0x10) == 0x10,
+		Carry: int(value1) + int(value2) + int(carryVal)> 0xFF,
+	}
+}
+
+func Subtract8Bit(value1 byte, value2 byte) ArithmeticResults8Bit {
+	res := value1 - value2
+	return ArithmeticResults8Bit{
+		Result: res,
+		Zero: res == byte(0x0),
+		HalfCarry: (((value1 & 0xF) - (value2 & 0xF)) & 0x10) == 0x10,
+		Carry: value2 > value1,
+	}
 }
