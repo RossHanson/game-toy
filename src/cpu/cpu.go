@@ -488,3 +488,20 @@ func OpCodesByName(codes map[byte]OpCode) map[string]OpCode {
 	}
 	return codesByName
 }
+
+func (c *Cpu) PrintKnownOpCodes() {
+	for msb := 0; msb < 16; msb++ {
+		for lsb := 0; lsb < 16; lsb++ {
+			index := byte(16*msb + lsb)
+			if code, exists := c.codes[index]; exists {
+				fmt.Printf("0x%02x - %s", index, code.Name())
+			} else {
+				fmt.Printf("0x%02x - Missing", index)
+			}
+			if lsb != 15 {
+				fmt.Print(" | ")
+			}
+		}
+		fmt.Print("\n")
+	}
+}

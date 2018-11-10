@@ -21,9 +21,7 @@ func setupCpu() (*Cpu, *memory.Memory) {
 func setupCpuWithState(state SystemState) (*Cpu, *memory.Memory) {
 	memory := memory.SetupBlankMemory(mockMemorySize)
 	cpu := NewCpu(memory)
-	log.Printf("Assigning %x into A", state.A)
 	cpu.A.Assign(state.A)
-	log.Printf("A's value: %x", cpu.A.Retrieve())
 	cpu.B.Assign(state.B)
 	cpu.C.Assign(state.C)
 	cpu.D.Assign(state.D)

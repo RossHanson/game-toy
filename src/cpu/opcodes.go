@@ -228,3 +228,31 @@ func (b *Add8BitRegOpCode) Name() string {
 	}
 	return fmt.Sprintf("%s %s,%s", base, b.r1.Name, b.r2.Name)
 }
+
+type Sub8BitRegOpCode struct {
+	BaseOpCode
+	r1 *Register8Bit
+	r2 *Register8Bit
+	includeCarry bool
+}
+
+func (b *Sub8BitRegOpCode) Run(cpu *Cpu) (int, bool, error) {
+	result := utils.Subtract8BitWithCarry(b.r1.Retrieve(), b.r2.Retrieve(),
+		b.includeCarry && cpu.GetFlag(C))
+	b.r1.Assign(result.Result)
+	cpu.SetFlag(Z, result.Zero)
+	cpu.SetFlag(H, result.HalfCarry)
+	cpu.SetFlag(C, result.Carry)
+	cpu.SetFlag(N, true)
+	return 4, false, nil
+}
+
+func (b *Sub8BitRegOpCode) Name() string {
+	if !b.includeCarry {
+		return fmt.Sprintf("SUB %s", b.r2.Name)
+	}
+	return fmt.Sprintf("SBC A,%s", b.r2.Name)
+}
+
+
+		
